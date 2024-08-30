@@ -3,12 +3,16 @@ from PIL import Image
 import requests
 from io import BytesIO
 import numpy as np
+from sklearn.cluster import KMeans
+from skimage import color
+from scipy.spatial.distance import euclidean
 
 from groundingdino.util.inference import load_model
 from groundingdino.util.inference import load_image
 from groundingdino.util.inference import predict, annotate
 from groundingdino.util import box_ops
 from segment_anything import build_sam, SamPredictor
+from download_image import download_image
 
 class GroundedSAMComposite():
     def __init__(self) -> None:
@@ -31,12 +35,32 @@ class GroundedSAMComposite():
         # Segment Anything        
         segmented_frame_masks = self._segment(image_source, self.sam_predictor, boxes=detected_boxes)
         mask = segmented_frame_masks[0][0].cpu().numpy()
+
+        # Load images with 
         image_source_pil = Image.fromarray(image_source)
         image_mask_pil = Image.fromarray(mask)
+
+        image_source_width, image_source_height = image_source_pil.size
+
+        is_centered = self._check_product_item_centered(
+            image_height=image_source_height,
+            image_width=image_source_width,
+            boxes=detected_boxes
+        )
+
+        is_background_uniform = self._check_background_uniformity(
+           segmented_frame_masks=segmented_frame_masks,
+           image_source_pil=image_source_pil 
+        )
+
+        is_sufficient_contrast = self._check_color_analysis(
+            image_source_pil=image_source_pil
+        )
+
         composite_image = Image.new("RGBA", image_source_pil.size)
         composite_image = Image.composite(image_source_pil, composite_image, image_mask_pil)
-        
-        return composite_image
+
+        return is_centered, is_background_uniform, is_sufficient_contrast, composite_image
     
     
     def _dino_detect(self, image, image_source, prompt):
@@ -90,16 +114,66 @@ class GroundedSAMComposite():
         composite_image = Image.composite(image_source_pil, composite_image, image_mask_pil)
         
         return composite_image
+    
 
+    def _check_product_item_centered(self, boxes, image_width, image_height):
+        if len(boxes) == 1:
+            box = boxes[0]
+            x_min_normalised, y_min_normalised, x_max_normalised, y_max_normalised = box
+            x_min = x_min_normalised * image_width
+            y_min = y_min_normalised * image_height
+            x_max = x_max_normalised * image_width
+            y_max = y_max_normalised * image_height
+            
+            acceptable_x_range = (image_width * 0.4, image_width * 0.6)
+            acceptable_y_range = (image_height * 0.4, image_height * 0.8)
 
-def download_image(url, image_file_path):
-    r = requests.get(url, timeout=4.0)
-    if r.status_code != requests.codes.ok:
-        assert False, 'Status code error: {}.'.format(r.status_code)
+            center_x = (x_min + x_max) / 2
+            center_y = (y_min + y_max) / 2
 
-    with Image.open(BytesIO(r.content)) as im:
-        im.save(image_file_path)
-    print('Image downloaded from url: {} and saved to: {}.'.format(url, image_file_path))
+            if not (acceptable_x_range[0] <= center_x <= acceptable_x_range[1] and acceptable_y_range[0] <= center_y <= acceptable_y_range[1]):
+                return False
+            else:
+                return True
+        else:
+            return False
+        
+    
+    def _check_background_uniformity(self, segmented_frame_masks, image_source_pil):
+        try:
+            mask = segmented_frame_masks[0][0].cpu().numpy()
+            inverted_mask = ((1 - mask) * 255).astype(np.uint8)
+            image_mask_pil = Image.fromarray(inverted_mask)
+            background = Image.new("RGBA", image_source_pil.size)
+            background = Image.composite(image_source_pil, background, image_mask_pil)
+            gray_background = background.convert("L")
+            gray_background_np = np.array(gray_background)
+            variance = np.var(gray_background_np)
+            uniformity_score = 1 / (1 + variance)
+            scaled_uniformity_score = uniformity_score * 1e5
+            threshold = 8
+            return scaled_uniformity_score > threshold
+        except:
+            return False
+        
+    
+    def _check_color_analysis(self, image_source_pil, threshold=20):
+        image_np = np.array(image_source_pil)
+        pixels = image_np.reshape(-1,3)
+        kmeans = KMeans(n_clusters=5)
+        kmeans.fit(pixels)
+        colors = kmeans.cluster_centers_
+        colors_lab = color.rgb2lab(colors[np.newaxis, :, :])[0]
+        contrast_scores = []
+        for i in range(len(colors_lab)):
+            for j in range(i + 1, len(colors_lab)):
+                # Calculate Euclidean distance between each pair of LAB colors
+                contrast = euclidean(colors_lab[i], colors_lab[j])
+                contrast_scores.append(contrast)
+        
+        sufficient_contrast = all(score >= threshold for score in contrast_scores)
+        return sufficient_contrast, colors, contrast_scores 
+
 
 
 if __name__ == "__main__":
