@@ -1,9 +1,10 @@
+import os
 from openai import OpenAI
 from fastapi import HTTPException
 from pydantic import BaseModel
 
 
-client = OpenAI(api_key="")
+client = OpenAI(api_key=os.getenv("OPEN_API_KEY"))
 
 def generate_product_prompt(item_description: str, title: str) -> str:
     system_prompt = f"""
@@ -11,13 +12,14 @@ def generate_product_prompt(item_description: str, title: str) -> str:
     """
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"{item_description} {title}"}
             ],
-        )
-        return {"response": response.choices[0].text.strip()}
+        )        
+        return response.choices[0].message.content
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
 

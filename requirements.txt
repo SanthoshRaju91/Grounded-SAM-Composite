@@ -3,3 +3,6 @@ uvicorn
 python-multipart
 openai
 requests
+scikit-learn
+scikit-image
+google-cloud-aiplatform

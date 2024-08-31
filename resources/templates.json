@@ -1,36 +1,36 @@
 {
     "temp_123": {
         "text_positions": {
-            "title": { "font_size": "30px", "position": [750, 280] },
-            "catchphrase": { "font_size": "28px", "position": [750, 290]}
+            "title": { "font_size": 80, "position": [750, 280] },
+            "catchphrase": { "font_size": 48, "position": [750, 290]}
         },
         "logo": {
             "size": [120, 120],
             "position": [720, 20]
         },
         "product_image": {
-            "size": [250, 250],
+            "size": [300, 250],
             "position": [50, 50]
         }        
     },
     "temp_456": {
         "text_positions": {
-            "title": { "font_size": "30px", "position": [750, 40] },
-            "catchphrase": { "font_size": "28px", "position": [750, 50]}
+            "title": { "font_size": 80, "position": [750, 40] },
+            "catchphrase": { "font_size": 48, "position": [750, 50]}
         },
         "logo": {
             "size": [120, 120],
             "position": [720, 180]
         },
         "product_image": {
-            "size": [250, 250],
-            "position": [50, 50]
+            "size": [300, 250],
+            "position": [560, 60]
         }
     },
     "temp_789": {
         "text_positions": {
-            "title": { "font_size": "30px", "position": [40, 10] },
-            "catchphrase": { "font_size": "28px", "position": [40, 20]}
+            "title": { "font_size": 80, "position": [40, 10] },
+            "catchphrase": { "font_size": 48, "position": [40, 20]}
         },
         "logo": {
             "size": [100, 100],
@@ -40,19 +40,5 @@
             "size": [250, 250],
             "position": [600, 50]
         }
-    },
-    "temp_112": {
-        "text_positions": {
-            "title": { "font_size": "30px", "position": [40, 250] },
-            "catchphrase": { "font_size": "28px", "position": [40, 260]}
-        },
-        "logo": {
-            "size": [100, 100],
-            "position": [20, 20]
-        },
-        "product_image": {
-            "size": [250, 250],
-            "position": [600, 50]
-        }
-    }
+    } 
 }

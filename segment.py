@@ -6,13 +6,24 @@ import numpy as np
 from sklearn.cluster import KMeans
 from skimage import color
 from scipy.spatial.distance import euclidean
+from pathlib import Path
+import json
 
 from groundingdino.util.inference import load_model
 from groundingdino.util.inference import load_image
 from groundingdino.util.inference import predict, annotate
 from groundingdino.util import box_ops
 from segment_anything import build_sam, SamPredictor
-from download_image import download_image
+
+def download_image(url, image_file_path):
+    r = requests.get(url, timeout=4.0)
+    if r.status_code != requests.codes.ok:
+        assert False, 'Status code error: {}.'.format(r.status_code)
+
+    with Image.open(BytesIO(r.content)) as im:
+        im.save(image_file_path)
+    print('Image downloaded from url: {} and saved to: {}.'.format(url, image_file_path))
+
 
 class GroundedSAMComposite():
     def __init__(self) -> None:
@@ -21,7 +32,7 @@ class GroundedSAMComposite():
             model_config_path="GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py",
             model_checkpoint_path="GroundingDINO/grouding_dino_weights.pth"
         )
-        sam_checkpoint = 'sam_vit_h_4b8939.pth'
+        sam_checkpoint = 'segment-anything/sam_vit_h_4b8939.pth'
         self.sam_predictor = SamPredictor(build_sam(checkpoint=sam_checkpoint).to(self.device))
         
     
@@ -53,7 +64,7 @@ class GroundedSAMComposite():
            image_source_pil=image_source_pil 
         )
 
-        is_sufficient_contrast = self._check_color_analysis(
+        is_sufficient_contrast, colors, contrast_scores  = self._check_color_analysis(
             image_source_pil=image_source_pil
         )
 
@@ -174,8 +185,6 @@ class GroundedSAMComposite():
         sufficient_contrast = all(score >= threshold for score in contrast_scores)
         return sufficient_contrast, colors, contrast_scores 
 
-
-
 if __name__ == "__main__":
     local_image_path = "assets/inpaint_demo.jpg"
     image_url = "https://m.media-amazon.com/images/I/61AIroGIryL._SX522_.jpg"
@@ -191,5 +200,3 @@ if __name__ == "__main__":
     # Segment the object
     segmented_frame_masks = instance._segment(image_source, instance.sam_predictor, boxes=detected_boxes)
     annotated_frame_with_mask = instance._draw_mask(segmented_frame_masks[0][0], annotated_frame)
-     
-    

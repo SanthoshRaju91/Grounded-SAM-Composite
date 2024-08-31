@@ -164,3 +164,8 @@ cython_debug/
 # models
 *.pth
 /**/*.pth
+
+venv
+gsam
+
+vertex-ai-service-account.json

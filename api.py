@@ -10,6 +10,7 @@ import json
 from segment import GroundedSAMComposite
 from prompt_fine_tuner import generate_product_prompt
 from download_image import download_image
+from banner_generate import generate_ad_banners
 
 app = FastAPI()
 
@@ -18,7 +19,7 @@ model = GroundedSAMComposite()
 items = None
 styles = None
 templates = None
-local_temp_dir = "/tmp"
+local_temp_dir = "/tmp/generations"
 
 def read_json_file(file_path):
     path = Path(file_path)
@@ -31,6 +32,13 @@ def read_json_file(file_path):
 def count_trues(tup):
     return sum(1 for item in tup if item is True)
 
+
+def create_dir(dir_path):
+    try:
+        os.makedirs(dir_path, exist_ok=True)
+    except Exception as e:
+        print(f"An error occurred while creating the directory: {str(e)}")
+        
 
 @app.on_event("startup")
 async def load_json_files():
@@ -45,6 +53,8 @@ async def load_json_files():
 
 class GeneratePayload(BaseModel):
     id: int
+    title: str
+    catchphrase: str
     banner_id: str
     style: str
     logo: str
@@ -65,23 +75,39 @@ def server_version():
 
 @app.post("/api/generate")
 async def predict(payload: GeneratePayload):
-    id = payload.id
+    job_id = payload.id
     banner_id = payload.banner_id
     style = payload.style
     logo = payload.logo
     item_url = payload.item_url
+    title = payload.title
+    catchphrase = payload.catchphrase
+
+    print(f"::: Got the request for job_id: {job_id}")
 
     item = items[item_url]
     background_prompt = styles[style]
     banner_template = templates[banner_id]
+
+    print(f"::: Getting the segmentation prompt")    
     segmentation_prompt = generate_product_prompt(item["item_description"], item["item_name"])
+    print(f"::: Got the segmentation prompt: {segmentation_prompt}")
+    
     images = item["images"]
     local_images = []
+    generation_dir = f"{local_temp_dir}/{job_id}"
+
+    print()
+    create_dir(generation_dir)
+
+    print(f"::: Downloading the images for the item: {item_url}")
     for idx, image in enumerate(images):        
-        local_image_path = f"{local_temp_dir}/image_{idx}.jpg"
+        local_image_path = f"{generation_dir}/image_{idx}.jpg"
         download_image(image, local_image_path)
         local_images.append(local_image_path)
+    print(f"::: Finished downloading images")
 
+    print(f"::: Performing segmentation and BPIP checks")
     predicts = []    
     for local_image in local_images:
         is_centered, is_background_uniform, is_sufficient_contrast, composite_image = model.predict(local_image_path=local_image, prompt=segmentation_prompt)
@@ -92,22 +118,21 @@ async def predict(payload: GeneratePayload):
             is_sufficient_contrast,
             composite_image
         ))
-    appropriate = max(predicts, key=count_trues)
-    print(appropriate[4])
-        
-    return "ok"
-    #  # Create a temporary file with NamedTemporaryFile
-    # with tempfile.NamedTemporaryFile(delete=False) as tmp:
-    #     # Copy the content of the uploaded file to the temporary file
-    #     shutil.copyfileobj(file.file, tmp)
-    #     tmp_path = tmp.name  # Store the path to the temporary file
+    print(f"::: Finished segmentations and BPIP checks")
 
-    # composite_image = model.predict(tmp_path, prompt)
-    
-    # image_str = pil_image_to_base64(composite_image)
-    # return {
-    #     "segmented_image": image_str
-    # }
+    print(f"::: Performing ranking")
+    appropriate = max(predicts, key=count_trues)
+
+    print(f"::: Finished BPIP ranking, saving the best product segmented image")
+    composite_image = appropriate[4]
+    composite_image_path = f"{generation_dir}/segmented_image.png"
+    composite_image.save(composite_image_path, format="PNG")
+    print(f"::: Saved the product's segmented image")
+
+    print(f"::: Generating ad banners")
+    generate_ad_banners(job_id, composite_image_path, logo, title, catchphrase, banner_template, background_prompt)
+
+    return "ok"
 
 
 
