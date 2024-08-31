@@ -11,6 +11,7 @@ from segment import GroundedSAMComposite
 from prompt_fine_tuner import generate_product_prompt
 from download_image import download_image
 from banner_generate import generate_ad_banners
+from update_status import update_status
 
 app = FastAPI()
 
@@ -130,7 +131,8 @@ async def predict(payload: GeneratePayload):
     print(f"::: Saved the product's segmented image")
 
     print(f"::: Generating ad banners")
-    generate_ad_banners(job_id, composite_image_path, logo, title, catchphrase, banner_template, background_prompt)
+    saved_images = generate_ad_banners(job_id, composite_image_path, logo, title, catchphrase, banner_template, background_prompt)
+    update_status(job_id, saved_images)
 
     return "ok"
 
@@ -151,4 +153,4 @@ def pil_image_to_base64(image: Image.Image) -> str:
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app="api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app="api:app", host="0.0.0.0", port=8000)

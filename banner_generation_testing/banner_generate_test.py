@@ -1,46 +1,26 @@
 import os
-import vertexai
-from vertexai.preview.vision_models import ImageGenerationModel
-from google.auth import credentials
 from PIL import Image, ImageDraw, ImageFont
 import io
-
-service_account_key_path = "/home/santhosh.nagaraj/ai-box/Grounded-SAM-Composite/vertex-ai-service-account.json"
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_key_path
-
-vertexai.init(project="mliops-prod", location="us-central1")
-model = ImageGenerationModel.from_pretrained("imagen-3.0-generate-001")
 
 local_temp_dir = "/tmp/generations"
 
 def generate_ad_banners(job_id, composite_image, logo, title, catchphrase, template, prompt):
     print(f"::: Generating backgrounds from image gen")
-    images = model.generate_images(
-        prompt=prompt,
-        number_of_images=2,
-        language="en",    
-        aspect_ratio="16:9",
-        safety_filter_level="no nudity, no abuse, no racism",
-    )
+
     print(f"::: Finished generating backgrounds")
 
-    generation_dir = f"{local_temp_dir}/{job_id}"
-    generated_bg_images_path = []
+    generation_dir = f"{local_temp_dir}/test"
+    generated_bg_images_path = ["/tmp/generations/14/generated_background_0.png"
+                                , "/tmp/generations/14/generated_background_1.png"]
 
     print(f"::: Saving the background images")
-    
-    for idx, image in enumerate(images):
-        local_image_path = f"{generation_dir}/generated_background_{idx}.png"
-        image.save(location=local_image_path, include_generation_parameters=False)
-        generated_bg_images_path.append(local_image_path)
 
     print(f"::: Background images saved")
     print(":"*100)
 
     print(f"::: Creating ad banners")
-    saved_images = []
     for idx, image in enumerate(generated_bg_images_path):
-        saved_image = create_banner(
+        create_banner(
             image,
             title,
             catchphrase,
@@ -49,9 +29,7 @@ def generate_ad_banners(job_id, composite_image, logo, title, catchphrase, templ
             job_id,
             idx
         )
-        saved_images.append(saved_image)
     print(f"::: Finished creating ad banners")
-    return saved_images
 
 
 def create_banner(local_image_path, title, catchphrase, segmented_image, template, job_id, gen_id):
@@ -71,8 +49,6 @@ def create_banner(local_image_path, title, catchphrase, segmented_image, templat
     text_height = bbox[3] - bbox[1]
 
     x = (image_width - text_width) * 0.7
-    if template["text_positions"]["title"]["position"] == "left":
-        x = (image_width - text_width) * 0.3
     y = 140
 
     # Define padding around the text
@@ -108,9 +84,7 @@ def create_banner(local_image_path, title, catchphrase, segmented_image, templat
     text_height = bbox[3] - bbox[1]
 
     x = (image_width - text_width) + 20
-    if template["text_positions"]["title"]["position"] == "left":
-        x = 20
-    y = 280
+    y = 240
 
 
     for offset in offsets:
@@ -133,11 +107,11 @@ def create_banner(local_image_path, title, catchphrase, segmented_image, templat
 
     banner = image.resize((800, 320))
     banner.paste(segmented_image, (x, y), segmented_image)
-    save_file = f"{local_temp_dir}/{job_id}/ad_banner_{gen_id}.png"
-    banner.save(save_file)
-    return save_file
+    banner.save(f"{local_temp_dir}/{job_id}/ad_banner_{gen_id}.png")
     
 
     
 
 
+if __name__ == "__main__":
+    generate_ad_banners()
